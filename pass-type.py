@@ -21,6 +21,8 @@ class PassType:
         "return": 0xFF0D,
         "escape": 0xFF1B,
         "delete": 0xFFFF,
+        "shift": 0xFFE1,
+        "control": 0xFFE3,
      }
 
     @staticmethod
@@ -94,9 +96,19 @@ class PassType:
             elif m.group(4): # brackets for future expansion?
                 pass # not implemented yet
             elif m.group(5): # raw keys
-                try: i = PassType._keys[m.group(5).lower()]
-                except KeyError: i = ord(m.group(5))
-                finally: keypress(seq, i, typing_delay)
+                keys = m.group(5).split("+")
+                for key in keys:
+                    try: i = PassType._keys[key.lower()]
+                    except KeyError: i = ord(key)
+                    finally:
+                        seq.append((PassType.Action.KeyDown, i))
+                seq.append((PassType.Action.Delay, typing_delay))
+                for key in reversed(keys):
+                    try: i = PassType._keys[key.lower()]
+                    except KeyError: i = ord(key)
+                    finally:
+                        seq.append((PassType.Action.KeyUp, i))
+                seq.append((PassType.Action.Delay, typing_delay))
 
         return seq
 
