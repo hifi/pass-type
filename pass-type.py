@@ -15,15 +15,6 @@ from jeepney.io.asyncio import open_dbus_router
 class PassType:
     Action = IntEnum('Action', [('Delay', 0), ('KeyDown', 1),('KeyUp', 2),])
     DBusAddress = DBusAddress('/org/freedesktop/portal/desktop', bus_name='org.freedesktop.portal.Desktop', interface='org.freedesktop.portal.RemoteDesktop')
-    _keys = {
-        "backspace": 0xFF08,
-        "tab": 0xFF09,
-        "return": 0xFF0D,
-        "escape": 0xFF1B,
-        "delete": 0xFFFF,
-        "shift": 0xFFE1,
-        "control": 0xFFE3,
-     }
 
     @staticmethod
     def _make_token(t): return f"{t}_{random()}".replace(".", "_")
@@ -69,6 +60,44 @@ class PassType:
                 case PassType.Action.KeyUp: await self.router.send_and_get_reply(new_method_call(PassType.DBusAddress, "NotifyKeyboardKeysym", 'oa{sv}iu', ( self.session_handle, {}, v, False,)))
 
     @staticmethod
+    def keymapgen():
+        templ = [
+            (0x20, ['space']), # raw used as a delimiter
+            (0x2B, ['plus']), # raw used as a delimiter
+            (0x20AC, ['EuroSign']),
+            (0xFF08, ['BackSpace', 'Tab', 'Linefeed', 'Clear']),
+            (0xFF0D, ['Return']),
+            (0xFF13, ['Pause', 'Scroll_Lock', 'Sys_Req']),
+            (0xFF1B, ['Escape']),
+            (0xFF50, ['Home', 'Left', 'Up', 'Right', 'Down', 'Prior', 'Next', 'End', 'Begin']),
+            (0xFF80, ['KP_Space']),
+            (0xFF89, ['KP_Tab']),
+            (0xFF8D, ['KP_Enter']),
+            (0xFF91, ['KP_F1', 'KP_F2', 'KP_F3', 'KP_F4', 'KP_Home', 'KP_Left', 'KP_Up', 'KP_Right', 'KP_Down', 'KP_Prior', 'KP_Next', 'KP_End', 'KP_Begin', 'KP_Insert', 'KP_Delete']),
+            (0xFFBE, ['F1','F2','F3','F4','F5','F6','F7','F8','F9','F10','F11','F12']),
+            (0xFFE1, ['Shift_L', 'Shift_R', 'Control_L', 'Control_R', 'Caps_Lock', 'Shift_Lock', 'Meta_L', 'Meta_R', 'Alt_L', 'Alt_R', 'Super_L', 'Super_R', 'Hyper_L', 'Hyper_R']),
+            (0xFFFF, ['Delete']),
+        ]
+        aliases = {
+            'Page_Up': 'Prior',
+            'Page_Down': 'Next',
+            'Enter': 'Return',
+            'Shift': 'Shift_L',
+            'Control': 'Control_L',
+            'Ctrl': 'Control_L',
+            '€': 'EuroSign',
+        }
+        keymap = {}
+        for i in range(0x20, 0xFF):
+            keymap[chr(i)] = i
+        for base, keys in templ:
+            for i, name in enumerate(keys):
+                keymap[name] = base + i
+        for k, v in aliases.items():
+            keymap[k] = keymap[v]
+        return keymap
+
+    @staticmethod
     def sequencer(start_delay, typing_delay, sequence):
         def keypress(seq, i, d):
             if i == None: return
@@ -88,26 +117,21 @@ class PassType:
                 if len(m) == 2:
                     data[m[0].strip().lower()] = m[1].strip()
 
+        keymap = PassType.keymapgen()
         seq = [(PassType.Action.Delay, start_delay)] if start_delay > 0 else []
 
         for m in re.finditer(r"({([^}]*)})|(\[([^\]]*)\])|([^{ [\]]+)", sequence):
             if m.group(2): # curly braces for input values
-                for c in data[m.group(2).lower()]: keypress(seq, ord(c), typing_delay)
+                for c in data[m.group(2).lower()]: keypress(seq, keymap[c], typing_delay)
             elif m.group(4): # brackets for future expansion?
                 pass # not implemented yet
             elif m.group(5): # raw keys
                 keys = m.group(5).split("+")
                 for key in keys:
-                    try: i = PassType._keys[key.lower()]
-                    except KeyError: i = ord(key)
-                    finally:
-                        seq.append((PassType.Action.KeyDown, i))
+                    seq.append((PassType.Action.KeyDown, keymap[key]))
                 seq.append((PassType.Action.Delay, typing_delay))
                 for key in reversed(keys):
-                    try: i = PassType._keys[key.lower()]
-                    except KeyError: i = ord(key)
-                    finally:
-                        seq.append((PassType.Action.KeyUp, i))
+                    seq.append((PassType.Action.KeyUp, keymap[key]))
                 seq.append((PassType.Action.Delay, typing_delay))
 
         return seq
