@@ -147,7 +147,7 @@ class PassType:
             exc != BlockingIOError and os.unlink(self.lock_path)
 
 async def main():
-    parser = argparse.ArgumentParser(prog="pass-type", description="Type passwords or other text with XDG Desktop Portal", formatter_class=argparse.ArgumentDefaultsHelpFormatter)
+    parser = argparse.ArgumentParser(prog="pass-type.py", description="Type passwords or other text with XDG Desktop Portal", formatter_class=argparse.ArgumentDefaultsHelpFormatter)
     parser.add_argument("-s", "--sequence", default="{0}", help="Sequence to type from stdin")
     parser.add_argument("-l", "--listen", action='store_true', default=False, help="Run as a server to listen for commands")
     parser.add_argument("-c", "--connect", action='store_true', default=False, help="Connect to a server to send commands to")

@@ -4,6 +4,8 @@ set -uo pipefail
 
 PASS_TYPE_MENU="bemenu -i -l 10 -p"
 
+pass-type.py -l &>/dev/null &
+
 mapfile -t choices < <(find $PREFIX -name '*.gpg' -printf '%P\n' | sort)
 
 gpgextre="(.+)\.gpg$"
@@ -23,7 +25,7 @@ mapfile -t data < <(pass show "$selected")
 
 seqs=("{Password}")
 kvre="^([^:]+):\s*(.+)$"
-for l in "${data[@]}"; do
+for l in "${data[@]:1}"; do
 	if [[ $l =~ $kvre ]]; then
 		if [[ ${BASH_REMATCH[1],,} == "auto-type" ]]; then
 			seqs=("${BASH_REMATCH[2]}" "${seqs[@]}")
@@ -37,4 +39,4 @@ done
 seq=$(printf "%s\n" "${seqs[@]}" | $PASS_TYPE_MENU "$selected")
 [[ -z $seq ]] && exit 1
 
-printf "%s\n" "${data[@]}" | python3 pass-type.py -s "$seq"
+printf "%s\n" "${data[@]}" | pass-type.py -c -s "$seq"
